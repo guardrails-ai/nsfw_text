@@ -1,5 +1,5 @@
 [project]
-name = "nsfw-text"
+name = "nsfw_text"
 version = "0.0.0"
 description = "A Guardrails AI validator to detect NSFW text"
 authors = [
