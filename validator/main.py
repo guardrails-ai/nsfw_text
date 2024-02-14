@@ -1,8 +1,4 @@
-import re
-import string
 from typing import Any, Callable, Dict, Optional
-
-import rstr
 
 from guardrails.validator_base import (
     FailResult,
@@ -12,60 +8,152 @@ from guardrails.validator_base import (
     register_validator,
 )
 
+try:
+    from transformers import pipeline
+except ImportError:
+    pipeline = None
 
-@register_validator(name="guardrails/regex_match", data_type="string")
-class RegexMatch(Validator):
-    """Validates that a value matches a regular expression.
+try:
+    import nltk  # type: ignore
+except ImportError:
+    nltk = None  # type: ignore
+
+if nltk is not None:
+    try:
+        nltk.data.find("tokenizers/punkt")
+    except LookupError:
+        nltk.download("punkt")
+
+
+@register_validator(name="guardrails/nsfw_text", data_type="string")
+class NSFWText(Validator):
+    """Validates that the generated text is safe for work (SFW).
 
     **Key Properties**
-
-    | Property                      | Description                       |
-    | ----------------------------- | --------------------------------- |
-    | Name for `format` attribute   | `regex_match`                     |
-    | Supported data types          | `string`                          |
-    | Programmatic fix              | Generate a string that matches the regular expression |
+    | Property                      | Description            |
+    | ----------------------------- | ---------------------- |
+    | Name for `format` attribute   | `guardrails/nsfw_text` |
+    | Supported data types          | `string`               |
+    | Programmatic fix              | N/A                    |
 
     Args:
-        regex: Str regex pattern
-        match_type: Str in {"search", "fullmatch"} for a regex search or full-match option
-    """  # noqa
+        threshold: The confidence threshold over which model inferences are considered.
+            Must be a float between 0 and 1. Defaults to 0.8
+        validation_method: Whether to validate at the sentence level or
+            over the full text. Must be one of `sentence` or `full`.
+            Defaults to `sentence`
+
+    This validator uses the pre-trained multi-class model from HuggingFace -
+    `michellejieli/NSFW_text_classifier` to check whether the generated text is
+    safe for work. If the model predicts the text to be "NSFW" with a confidence
+    higher than the threshold, the validator fails. Otherwise, it passes.
+
+    If validation_method is `sentence`, the validator will remove the sentences
+    that are predicted to be NSFW and return the remaining sentences. If
+    validation_method is `full`, the validator will remove the entire text if
+    the prediction is deemed NSFW it will return an empty string.
+    """
 
     def __init__(
         self,
-        regex: str,
-        match_type: Optional[str] = None,
+        threshold: float = 0.8,
+        validation_method: str = "sentence",
         on_fail: Optional[Callable] = None,
+        **kwargs,
     ):
-        # todo -> something forces this to be passed as kwargs and therefore xml-ized.
-        # match_types = ["fullmatch", "search"]
-
-        if match_type is None:
-            match_type = "fullmatch"
-        assert match_type in [
-            "fullmatch",
-            "search",
-        ], 'match_type must be in ["fullmatch", "search"]'
-
-        super().__init__(on_fail=on_fail, match_type=match_type, regex=regex)
-        self._regex = regex
-        self._match_type = match_type
-
-    def validate(self, value: Any, metadata: Dict) -> ValidationResult:
-        p = re.compile(self._regex)
-        """Validates that value matches the provided regular expression."""
-        # Pad matching string on either side for fix
-        # example if we are performing a regex search
-        str_padding = (
-            "" if self._match_type == "fullmatch" else rstr.rstr(string.ascii_lowercase)
+        super().__init__(
+            on_fail, threshold=threshold, validation_method=validation_method, **kwargs
         )
-        self._fix_str = str_padding + rstr.xeger(self._regex) + str_padding
+        self._threshold = float(threshold)
+        if validation_method not in ["sentence", "full"]:
+            raise ValueError("validation_method must be 'sentence' or 'full'.")
+        self._validation_method = validation_method
 
-        if not getattr(p, self._match_type)(value):
+        # Check if transformers.pipeline is imported
+        if pipeline is None:
+            raise ValueError(
+                "You must install transformers in order to "
+                "use the NSFWText validator."
+                "Install it using `pip install transformers`."
+            )
+
+        # Define the model, pipeline and labels
+        self._model_name = "michellejieli/NSFW_text_classifier"
+        self._pipe = pipeline(
+            "text-classification",
+            model=self._model_name,
+        )
+        print("Pipeline setup successfully.")
+
+    def is_nsfw(self, value: str) -> bool:
+        """Determines if the generated text is NSFW.
+
+        Args:
+            value (str): The generated text.
+
+        Returns:
+            bool: Whether the generated text is NSFW.
+        """
+        result = self._pipe(value)
+        if not result:
+            raise RuntimeError("Failed to get model prediction.")
+
+        pred_label, confidence = result[0]["label"], result[0]["score"]  # type: ignore
+        if pred_label == "NSFW" and confidence > self._threshold:
+            return True
+        return False
+
+    def validate_each_sentence(
+        self, value: str, metadata: Dict[str, Any]
+    ) -> ValidationResult:
+        """Validate that each sentence in the generated text is SFW."""
+
+        if nltk is None:
+            raise ImportError(
+                "`nltk` is required for the `NSFWText` validator. "
+                "Please install it with `pip install nltk`."
+            )
+        # Split the value into sentences using nltk sentence tokenizer.
+        sentences = nltk.sent_tokenize(value)
+
+        unsupported_sentences, supported_sentences = [], []
+        for sentence in sentences:
+            is_nsfw = self.is_nsfw(sentence)
+            if is_nsfw:
+                unsupported_sentences.append(sentence)
+            else:
+                supported_sentences.append(sentence)
+
+        if unsupported_sentences:
+            unsupported_sentences = "- " + "\n- ".join(unsupported_sentences)
             return FailResult(
-                error_message=f"Result must match {self._regex}",
-                fix_value=self._fix_str,
+                metadata=metadata,
+                error_message=(
+                    f"The following sentences in your response"
+                    "were found to be NSFW:\n"
+                    f"\n{unsupported_sentences}"
+                ),
+                fix_value="\n".join(supported_sentences),
             )
         return PassResult()
 
-    def to_prompt(self, with_keywords: bool = True) -> str:
-        return "results should match " + self._regex
+    def validate_full_text(
+        self, value: str, metadata: Dict[str, Any]
+    ) -> ValidationResult:
+        """Validate that the entire generated text is SFW."""
+
+        is_nsfw = self.is_nsfw(value)
+        if is_nsfw:
+            return FailResult(
+                metadata=metadata,
+                error_message="The generated text was found to be NSFW.",
+            )
+        return PassResult()
+
+    def validate(self, value: str, metadata: Dict[str, Any]) -> ValidationResult:
+        """Validation method of the NSFWText validator."""
+        if self._validation_method == "sentence":
+            return self.validate_each_sentence(value, metadata)
+
+        if self._validation_method == "full":
+            return self.validate_full_text(value, metadata)

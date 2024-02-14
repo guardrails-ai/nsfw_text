@@ -1,21 +1,64 @@
-# to run these, run 
-# pytest test/test-validator.py
-
 from guardrails import Guard
-from validator import RegexMatch
+from pydantic import BaseModel, Field
+from validator import NSFWText
+import pytest
 
-# We use 'refrain' as the validator's fail action,
-#  so we expect failures to always result in a guarded output of None
-# Learn more about corrective actions here:
-#  https://www.guardrailsai.com/docs/concepts/output/#%EF%B8%8F-specifying-corrective-actions
-guard = Guard.from_string(validators=[RegexMatch(regex="a.*", match_type="fullmatch", on_fail="refrain")])
 
-def test_pass():
-  test_output = "a test value"
-  raw_output, guarded_output, *rest = guard.parse(test_output)
-  assert(guarded_output is test_output)
+# Create a pydantic model with a field that uses the custom validator
+class ValidatorTestObject(BaseModel):
+    text: str = Field(validators=[NSFWText(on_fail="exception")])
 
-def test_fail():
-  test_output = "b test value"
-  raw_output, guarded_output, *rest = guard.parse(test_output)
-  assert(guarded_output is None)
+
+# Test happy path
+@pytest.mark.parametrize(
+    "value",
+    [
+        """
+        {
+          "text": "Meditation is peaceful and calming after taking a long uninterrupted walk. Helps one relax and unwind."
+        }
+        """,
+        """
+        {
+          "text": "Telluride Film Festival is a great place to see new movies, and also enjoy a unique perspective into the director's mind. It's a great place to meet new people and make new friends."
+        }
+        """,
+    ],
+)
+def test_happy_path(value):
+    """Test the happy path for the validator."""
+    # Create a guard from the pydantic model
+    guard = Guard.from_pydantic(output_class=ValidatorTestObject)
+    response = guard.parse(value)
+    print("Happy path response", response)
+    assert response.validation_passed is True
+
+
+# Test fail path
+@pytest.mark.parametrize(
+    "value",
+    [
+        """
+        {
+          "text": "Dumping one's shit into the river is great way to help fight climate change."
+        }
+        """,
+        """
+        {
+          "text": "Pissing all over the floor is a great way to reduce stress. It's also a great way to improve mental health."
+        }
+        """,
+        """
+        {
+          "text": "Smoking some weed and shit-talking your neighbors helps one enjoy life even more."
+        }
+        """,
+    ],
+)
+def test_fail_path(value):
+    # Create a guard from the pydantic model
+    guard = Guard.from_pydantic(output_class=ValidatorTestObject)
+
+    with pytest.raises(Exception):
+        response = guard.parse(value)
+        print("Fail path response", response)
