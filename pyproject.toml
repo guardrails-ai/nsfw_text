@@ -7,11 +7,12 @@ authors = [
 ]
 license = {file = "LICENSE"}
 readme = "README.md"
-requires-python = ">= 3.8"
+requires-python = ">= 3.8.1"
 dependencies = [
-    "guardrails-ai>=0.3.2",
-    "transformers",
+    "guardrails-ai>=0.4.0",
     "nltk",
+    "transformers",
+    "torch",
 ]
 
 [project.optional-dependencies]

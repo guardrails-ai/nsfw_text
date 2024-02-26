@@ -8,21 +8,8 @@ from guardrails.validator_base import (
     register_validator,
 )
 
-try:
-    from transformers import pipeline
-except ImportError:
-    pipeline = None
-
-try:
-    import nltk  # type: ignore
-except ImportError:
-    nltk = None  # type: ignore
-
-if nltk is not None:
-    try:
-        nltk.data.find("tokenizers/punkt")
-    except LookupError:
-        nltk.download("punkt")
+import nltk
+from transformers import pipeline
 
 
 @register_validator(name="guardrails/nsfw_text", data_type="string")
@@ -69,14 +56,6 @@ class NSFWText(Validator):
             raise ValueError("validation_method must be 'sentence' or 'full'.")
         self._validation_method = validation_method
 
-        # Check if transformers.pipeline is imported
-        if pipeline is None:
-            raise ValueError(
-                "You must install transformers in order to "
-                "use the NSFWText validator."
-                "Install it using `pip install transformers`."
-            )
-
         # Define the model, pipeline and labels
         self._model_name = "michellejieli/NSFW_text_classifier"
         self._pipe = pipeline(
@@ -108,11 +87,6 @@ class NSFWText(Validator):
     ) -> ValidationResult:
         """Validate that each sentence in the generated text is SFW."""
 
-        if nltk is None:
-            raise ImportError(
-                "`nltk` is required for the `NSFWText` validator. "
-                "Please install it with `pip install nltk`."
-            )
         # Split the value into sentences using nltk sentence tokenizer.
         sentences = nltk.sent_tokenize(value)
 
