@@ -4,21 +4,21 @@
 | --- | --- |
 | Date of development | Feb 15, 2024 |
 | Validator type | Format |
-| Blog |  |
+| Blog | - |
 | License | Apache 2 |
 | Input/Output | Output |
 
 ## Description
 
-This validator checks if an LLM-generated text is not safe for work (NSFW). It validates either sentence-by-sentence or the entire text.
+This validator checks if an LLM-generated text is not safe for work (NSFW). It validates both sentence-by-sentence and the entire text.
 
 ## Requirements
-- Dependencies: `nltk`, `transformers`
+- Dependencies: `nltk`, `transformers`, `torch`
 
 ## Installation
 
 ```bash
-$ guardrails hub install hub://guardrails/nsfw_text
+guardrails hub install hub://guardrails/nsfw_text
 ```
 
 ## Usage Examples
@@ -32,50 +32,29 @@ In this example, we use the `nsfw_text` validator on any LLM generated text.
 from guardrails.hub import NSFWText
 from guardrails import Guard
 
-# Initialize Validator
-val = NSFWText()
-
-# Setup Guard
-guard = Guard.from_string(
-    validators=[val, ...],
+# Use the Guard with the validator
+guard = Guard().use(
+    NSFWText, threshold=0.8, validation_method="sentence", on_fail="exception"
 )
 
-# Pass LLM output through guard
-guard.parse("Meditation is a good way to relax and enjoy life.")  # Pass
-guard.parse("Pissing all over the floor is a good hygiene practice.")  # Fail
+# Test passing response
+guard.validate(
+    "Christopher Nolan's Tenet is a mind-bending action thriller that will keep you on the edge of your seat. The film is a must-watch for all Nolan fans."
+)
 
+try:
+    # Test failing response
+    guard.validate(
+        "Climate Change is real and we need to do something about it. Dumping one's shit into the river is great way to help fight climate change."
+    )
+except Exception as e:
+    print(e)
 ```
-### Validating JSON output via Python
+Output:
+```console
+Validation failed for field with errors: The following sentences in your response were found to be NSFW:
 
-In this example, we use the `nsfw_text` validator on a pet description string.
-
-```python
-# Import Guard and Validator
-from pydantic import BaseModel
-from guardrails.hub import NSFWText
-from guardrails import Guard
-
-val = NSFWText()
-
-# Create Pydantic BaseModel
-class PetInfo(BaseModel):
-    pet_description: str = Field(validators=[val])
-
-# Create a Guard to check for valid Pydantic output
-guard = Guard.from_pydantic(output_class=PetInfo)
-
-# Run LLM output generating JSON through guard
-guard.parse("""
-{
-    "pet_description": "Caesar is a great cat who is fun to hang out with.",
-}
-""")
-
-guard.parse("""
-{
-    "pet_description": "Caeser loves to piss all over the floor."
-}
-""")
+- Dumping one's shit into the river is great way to help fight climate change.
 ```
 
 ## API Reference
@@ -97,7 +76,7 @@ Initializes a new instance of the Validator class.
 <br />
 
 
-**`__call__(self, value, metadata={}) → ValidationOutcome`**
+**`__call__(self, value, metadata={}) → ValidationResult`**
 
 <ul>
 
