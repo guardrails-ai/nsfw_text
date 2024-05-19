@@ -1,24 +1,29 @@
-## Overview
+# Overview
 
 | Developed by | Guardrails AI |
-| --- | --- |
 | Date of development | Feb 15, 2024 |
 | Validator type | Format |
-| Blog | - |
+| Blog |  |
 | License | Apache 2 |
 | Input/Output | Output |
 
 ## Description
 
+### Intended Use
 This validator checks if an LLM-generated text is not safe for work (NSFW). It validates both sentence-by-sentence and the entire text.
 
-## Requirements
-- Dependencies: `nltk`, `transformers`, `torch`
+### Requirements
+
+* Dependencies:
+    - guardrails-ai>=0.4.0   
+    - nltk
+    - transformers
+    - torch
 
 ## Installation
 
 ```bash
-guardrails hub install hub://guardrails/nsfw_text
+$ guardrails hub install hub://guardrails/nsfw_text
 ```
 
 ## Usage Examples
@@ -32,7 +37,7 @@ In this example, we use the `nsfw_text` validator on any LLM generated text.
 from guardrails.hub import NSFWText
 from guardrails import Guard
 
-# Use the Guard with the validator
+# Setup Guard with the validator
 guard = Guard().use(
     NSFWText, threshold=0.8, validation_method="sentence", on_fail="exception"
 )
@@ -57,29 +62,22 @@ Validation failed for field with errors: The following sentences in your respons
 - Dumping one's shit into the river is great way to help fight climate change.
 ```
 
-## API Reference
+# API Reference
 
 **`__init__(self, threshold=0.8, validation_method="sentence", on_fail="noop")`**
 <ul>
-
 Initializes a new instance of the Validator class.
 
-**Parameters:**
-
-- **threshold** *(float):* The confidence threshold over which model inferences are considered. Default is 0.8.
-- **validation_method** *(str):* The method to use for validation. If `sentence`, the validator will validate each sentence in the input text. If `full`, the validator will validate the entire input text. Default is `sentence`.
+**Parameters**
+- **`threshold`** *(float):* The confidence threshold over which model inferences are considered. Default is 0.8.
+- **`validation_method`** *(str):* The method to use for validation. If `sentence`, the validator will validate each sentence in the input text. If `full`, the validator will validate the entire input text. Default is `sentence`.
 - **`on_fail`** *(str, Callable):* The policy to enact when a validator fails. If `str`, must be one of `reask`, `fix`, `filter`, `refrain`, `noop`, `exception` or `fix_reask`. Otherwise, must be a function that is called when the validator fails.
-
 </ul>
-
-
-<br />
+<br/>
 
 
 **`__call__(self, value, metadata={}) -> ValidationResult`**
-
 <ul>
-
 Validates the given `value` using the rules defined in this validator, relying on the `metadata` provided to customize the validation process. This method is automatically invoked by `guard.parse(...)`, ensuring the validation logic is applied to the input data.
 
 Note:
@@ -87,8 +85,7 @@ Note:
 1. This method should not be called directly by the user. Instead, invoke `guard.parse(...)` where this method will be called internally for each associated Validator.
 2. When invoking `guard.parse(...)`, ensure to pass the appropriate `metadata` dictionary that includes keys and values required by this validator. If `guard` is associated with multiple validators, combine all necessary metadata into a single dictionary.
 
-**Parameters:**
-
+**Parameters**
 - **`value`** *(Any):* The input value to validate.
 - **`metadata`** *(dict):* A dictionary containing metadata required for validation. No additional metadata keys are needed for this validator.
 
