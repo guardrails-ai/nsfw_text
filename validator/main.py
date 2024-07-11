@@ -1,5 +1,6 @@
 from typing import Any, Callable, Dict, Optional
 
+import nltk
 from guardrails.validator_base import (
     FailResult,
     PassResult,
@@ -7,8 +8,6 @@ from guardrails.validator_base import (
     Validator,
     register_validator,
 )
-
-import nltk
 from transformers import pipeline
 
 
@@ -45,6 +44,7 @@ class NSFWText(Validator):
         self,
         threshold: float = 0.8,
         validation_method: str = "sentence",
+        device="cpu",
         on_fail: Optional[Callable] = None,
         **kwargs,
     ):
@@ -61,6 +61,7 @@ class NSFWText(Validator):
         self._pipe = pipeline(
             "text-classification",
             model=self._model_name,
+            device=device,
         )
         print("Pipeline setup successfully.")
 
