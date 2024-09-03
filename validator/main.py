@@ -70,18 +70,14 @@ class NSFWText(Validator):
                 model=model_name,
             )
 
-    def get_nsfw(self, value: str) -> List[str]:
-        """Check whether the generated text is NSFW.
-
-        Returns the labels predicted by the model with
-        confidence higher than the threshold.
+    def is_nsfw(self, value: str) -> List[str]:
+        """Determines if the generated text is NSFW.
 
         Args:
             value (str): The generated text.
 
         Returns:
-            pred_labels (List[str]): Labels predicted by the model
-            with confidence higher than the threshold.
+            bool: Whether the generated text is NSFW.
         """
         pred_labels = []
         if value:
@@ -97,6 +93,9 @@ class NSFWText(Validator):
     def validate_each_sentence(
         self, value: str, metadata: Dict[str, Any]
     ) -> ValidationResult:
+        """Validate that each sentence in the generated text is SFW."""
+
+        # Split the value into sentences using nltk sentence tokenizer.
         sentences = nltk.sent_tokenize(value)
 
         unsupported_sentences, supported_sentences = [], []
@@ -150,7 +149,7 @@ class NSFWText(Validator):
             value = [value]
         predictions = []
         for text in value:
-            pred_labels = self.get_nsfw(text)
+            pred_labels = self.is_nsfw(text)
             predictions.append(pred_labels)
 
         return predictions
