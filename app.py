@@ -7,6 +7,7 @@ import os
 app = FastAPI()
 # Initialize the NSFW model once
 env = os.environ.get("env", "dev")
+torch_device = "cuda" if env == "prod" else "cpu" 
 
 class InferenceData(BaseModel):
     name: str
@@ -42,7 +43,11 @@ async def check_nsfw(input_request: InputRequest):
 
 class NSFWText:
     model_name = "michellejieli/NSFW_text_classifier"
-    pipe = pipeline("text-classification", model=model_name)
+    pipe = pipeline(
+        "text-classification", 
+        model=model_name,
+        device=torch_device
+    )
 
     def infer(text_vals, threshold) -> OutputResponse:
         outputs = []
