@@ -21,18 +21,18 @@ class NSFWText(Validator):
     """Validates that the generated text is safe for work (SFW).
 
     **Key Properties**
-    | Property                      | Description                       |
-    | ----------------------------- | --------------------------------- |
-    | Name for `format` attribute   | `guardrails/nsfw_text`            |
-    | Supported data types          | `string`                          |
-    | Programmatic fix              | None                              |
+    | Property                      | Description            |
+    | ----------------------------- | ---------------------- |
+    | Name for `format` attribute   | `guardrails/nsfw_text` |
+    | Supported data types          | `string`               |
+    | Programmatic fix              | N/A                    |
 
     Args:
         threshold: The confidence threshold over which model inferences are considered.
-            Defaults to 0.8.
+            Must be a float between 0 and 1. Defaults to 0.8
         validation_method: Whether to validate at the sentence level or
             over the full text. Must be one of `sentence` or `full`.
-            Defaults to `sentence`.
+            Defaults to `sentence`
 
     This validator uses the pre-trained multi-class model from HuggingFace -
     `michellejieli/NSFW_text_classifier` to check whether the generated text is
@@ -42,7 +42,7 @@ class NSFWText(Validator):
     If validation_method is `sentence`, the validator will remove the sentences
     that are predicted to be NSFW and return the remaining sentences. If
     validation_method is `full`, the validator will remove the entire text if
-    the prediction is deemed NSFW and return an empty string.
+    the prediction is deemed NSFW it will return an empty string.
     """
 
     def __init__(
