@@ -77,7 +77,7 @@ class NSFWText(Validator):
             value (str): The generated text.
 
         Returns:
-            bool: Whether the generated text is NSFW.
+            list[str]: Labels predicted by the model
         """
         pred_labels = []
         if value:
