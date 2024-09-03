@@ -1,6 +1,6 @@
 import difflib
 import json
-from typing import Any, Callable, Dict, List, Optional, Union, cast
+from typing import Any, Callable, Dict, List, Optional
 
 import nltk
 from guardrails.validator_base import (
