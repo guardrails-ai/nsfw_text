@@ -142,7 +142,7 @@ class NSFWText(Validator):
 
         return self.validate_each_sentence(value, metadata)
 
-    def _inference_local(self, value: str | list) -> ValidationResult:
+    def _inference_local(self, value: str | list) -> List[List[str]]:
         """Local inference method for the NSFW text validator."""
 
         if isinstance(value, str):
@@ -154,7 +154,7 @@ class NSFWText(Validator):
 
         return predictions
 
-    def _inference_remote(self, value: str | list) -> ValidationResult:
+    def _inference_remote(self, value: str | list) -> List[List[str]]:
         """Remote inference method for the NSFW text validator."""
 
         if isinstance(value, str):
