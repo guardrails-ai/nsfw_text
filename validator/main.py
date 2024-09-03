@@ -142,30 +142,30 @@ class NSFWText(Validator):
 
         return self.validate_each_sentence(value, metadata)
 
-    def _inference_local(self, value: str | list) -> ValidationResult:
+    def _inference_local(self, model_input: str | list) -> ValidationResult:
         """Local inference method for the NSFW text validator."""
-
-        if isinstance(value, str):
-            value = [value]
+        
+        if isinstance(model_input, str):
+            model_input = [model_input]
         predictions = []
-        for text in value:
+        for text in model_input:
             pred_labels = self.is_nsfw(text)
             predictions.append(pred_labels)
+        
+        return self._generate_validation_result(predictions)
 
-        return predictions
-
-    def _inference_remote(self, value: str | list) -> ValidationResult:
+    def _inference_remote(self, model_input: str | list) -> ValidationResult:
         """Remote inference method for the NSFW text validator."""
-
-        if isinstance(value, str):
-            value = [value]
-
+        
+        if isinstance(model_input, str):
+            model_input = [model_input]
+        
         request_body = {
             "inputs": [
                 {
                     "name": "text",
-                    "shape": [len(value)],
-                    "data": value,
+                    "shape": [len(model_input)],
+                    "data": model_input,
                     "datatype": "BYTES"
                 },
                 {
@@ -179,9 +179,10 @@ class NSFWText(Validator):
         response = self._hub_inference_request(json.dumps(request_body), self.validation_endpoint)
         if not response or "outputs" not in response:
             raise ValueError("Invalid response from remote inference", response)
-
+        
         data = [output["data"][0] for output in response["outputs"]]
-        return data
+        return self._generate_validation_result(data)
+
 
     def get_error_spans(self, original: str, fixed: str) -> List[ErrorSpan]:
         """Generate error spans to display in failresult (if they exist). Error
