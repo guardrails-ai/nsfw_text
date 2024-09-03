@@ -143,7 +143,7 @@ class NSFWText(Validator):
             return self.validate_each_sentence(value, metadata)
         return self.validate_full_text(value, metadata)
 
-    def _inference_local(self, value: str | list) -> List[bool]:
+    def _inference_local(self, value: str | list) -> ValidationResult:
         """Local inference method for the NSFW text validator."""
 
         if isinstance(value, str):
@@ -153,7 +153,7 @@ class NSFWText(Validator):
             predictions.append(self.is_nsfw(text))
         return predictions
 
-    def _inference_remote(self, value: str | list) -> List[bool]:
+    def _inference_remote(self, value: str | list) -> ValidationResult:
         """Remote inference method for the NSFW text validator."""
 
         if isinstance(value, str):
@@ -181,7 +181,7 @@ class NSFWText(Validator):
         if not response or "outputs" not in response:
             raise ValueError("Invalid response from remote inference", response)
 
-        data = [bool(output["data"][0]) for output in response["outputs"]]
+        data = [output["data"][0] for output in response["outputs"]]
         return data
 
     def get_error_spans(self, original: str, fixed: str) -> List[ErrorSpan]:
