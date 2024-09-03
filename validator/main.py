@@ -152,7 +152,7 @@ class NSFWText(Validator):
             pred_labels = self.is_nsfw(text)
             predictions.append(pred_labels)
         
-        return self._generate_validation_result(predictions)
+        return predictions
 
     def _inference_remote(self, model_input: str | list) -> ValidationResult:
         """Remote inference method for the NSFW text validator."""
@@ -181,7 +181,7 @@ class NSFWText(Validator):
             raise ValueError("Invalid response from remote inference", response)
         
         data = [output["data"][0] for output in response["outputs"]]
-        return self._generate_validation_result(data)
+        return data
 
 
     def get_error_spans(self, original: str, fixed: str) -> List[ErrorSpan]:
