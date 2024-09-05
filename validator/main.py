@@ -98,7 +98,7 @@ class NSFWText(Validator):
         # Split the value into sentences using nltk sentence tokenizer.
         sentences = nltk.sent_tokenize(value)
 
-        unsupported_sentences, supported_sentences = [], []
+        clean_sentences, nsfw_sentences = [], []
         error_spans: List[ErrorSpan] = []
         char_index = 0
 
@@ -108,7 +108,7 @@ class NSFWText(Validator):
             pred_labels = sentence_predictions[idx]
 
             if pred_labels:
-                unsupported_sentences.append(sentence)
+                nsfw_sentences.append(sentence)
                 error_spans.append(
                     ErrorSpan(
                         start=char_index,
@@ -117,11 +117,11 @@ class NSFWText(Validator):
                     )
                 )
             else:
-                supported_sentences.append(sentence)
+                clean_sentences.append(sentence)
             char_index += len(sentence) + 1  
 
-        if unsupported_sentences:
-            unsupported_sentences_text = "- " + "\n- ".join(unsupported_sentences)
+        if nsfw_sentences:
+            nsfw_sentences_text = "- " + "\n- ".join(nsfw_sentences)
 
             return FailResult(
                 metadata=metadata,

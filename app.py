@@ -3,12 +3,20 @@ from pydantic import BaseModel
 from typing import List
 from transformers import pipeline
 import os
+import torch
 
 app = FastAPI()
-# Initialize the NSFW model once
-env = os.environ.get("env", "dev")
-torch_device = "cuda" if env == "prod" else "cpu" 
 
+env = os.environ.get("env", "dev")
+
+if env == "prod" and torch.cuda.is_available():
+    torch_device = "cuda"
+elif env == "prod" and not torch.cuda.is_available():
+    print("Warning: CUDA is not available. Falling back to CPU.")
+    torch_device = "cpu"
+else:
+    torch_device = "cpu"
+    
 class InferenceData(BaseModel):
     name: str
     shape: List[int]
