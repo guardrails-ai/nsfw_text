@@ -7,11 +7,11 @@ import torch
 
 app = FastAPI()
 
-env = os.environ.get("env", "dev")
+device = os.environ.get("GUARDRAILS_DEVICE", "cpu")
 
-if env == "prod" and torch.cuda.is_available():
+if device == "cuda" and torch.cuda.is_available():
     torch_device = "cuda"
-elif env == "prod" and not torch.cuda.is_available():
+elif device == "cuda" and not torch.cuda.is_available():
     print("Warning: CUDA is not available. Falling back to CPU.")
     torch_device = "cpu"
 else:
