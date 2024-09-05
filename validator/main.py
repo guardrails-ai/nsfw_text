@@ -1,18 +1,22 @@
-from typing import Any, Callable, Dict, Optional
+import difflib
+import json
+from typing import Any, Callable, Dict, List, Optional, Union, cast
 
+import nltk
 from guardrails.validator_base import (
+    ErrorSpan,
     FailResult,
     PassResult,
     ValidationResult,
     Validator,
     register_validator,
 )
-
-import nltk
 from transformers import pipeline
 
 
-@register_validator(name="guardrails/nsfw_text", data_type="string")
+@register_validator(
+    name="guardrails/nsfw_text", data_type="string", has_guardrails_endpoint=True
+)
 class NSFWText(Validator):
     """Validates that the generated text is safe for work (SFW).
 
@@ -45,42 +49,46 @@ class NSFWText(Validator):
         self,
         threshold: float = 0.8,
         validation_method: str = "sentence",
-        on_fail: Optional[Callable] = None,
+        device: Optional[Union[str, int]] = "cpu",
+        model_name: Optional[str] = "michellejieli/NSFW_text_classifier",
+        on_fail: Optional[Callable[..., Any]] = None,
         **kwargs,
     ):
         super().__init__(
-            on_fail, threshold=threshold, validation_method=validation_method, **kwargs
+            on_fail=on_fail,
+            threshold=threshold,
+            validation_method=validation_method,
+            **kwargs,
         )
         self._threshold = float(threshold)
         if validation_method not in ["sentence", "full"]:
             raise ValueError("validation_method must be 'sentence' or 'full'.")
         self._validation_method = validation_method
+        if self.use_local:
+            self._model = pipeline(
+                "text-classification",
+                model=model_name,
+            )
 
-        # Define the model, pipeline and labels
-        self._model_name = "michellejieli/NSFW_text_classifier"
-        self._pipe = pipeline(
-            "text-classification",
-            model=self._model_name,
-        )
-        print("Pipeline setup successfully.")
-
-    def is_nsfw(self, value: str) -> bool:
+    def is_nsfw(self, value: str) -> List[str]:
         """Determines if the generated text is NSFW.
 
         Args:
             value (str): The generated text.
 
         Returns:
-            bool: Whether the generated text is NSFW.
+            list[str]: Labels predicted by the model
         """
-        result = self._pipe(value)
-        if not result:
-            raise RuntimeError("Failed to get model prediction.")
-
-        pred_label, confidence = result[0]["label"], result[0]["score"]  # type: ignore
-        if pred_label == "NSFW" and confidence > self._threshold:
-            return True
-        return False
+        pred_labels = []
+        if value:
+            results = self._model(value)
+            if results:
+                results = cast(List[List[Dict[str, Any]]], results)
+                for result in results:
+                    label, score = result["label"], result["score"]
+                    if label == "NSFW" and score > self._threshold:
+                        pred_labels.append(label)
+        return pred_labels
 
     def validate_each_sentence(
         self, value: str, metadata: Dict[str, Any]
@@ -90,44 +98,120 @@ class NSFWText(Validator):
         # Split the value into sentences using nltk sentence tokenizer.
         sentences = nltk.sent_tokenize(value)
 
-        unsupported_sentences, supported_sentences = [], []
-        for sentence in sentences:
-            is_nsfw = self.is_nsfw(sentence)
-            if is_nsfw:
-                unsupported_sentences.append(sentence)
-            else:
-                supported_sentences.append(sentence)
+        clean_sentences, nsfw_sentences = [], []
+        error_spans: List[ErrorSpan] = []
+        char_index = 0
 
-        if unsupported_sentences:
-            unsupported_sentences = "- " + "\n- ".join(unsupported_sentences)
+        sentence_predictions = self._inference(sentences)
+
+        for idx, sentence in enumerate(sentences):
+            pred_labels = sentence_predictions[idx]
+
+            if pred_labels:
+                nsfw_sentences.append(sentence)
+                error_spans.append(
+                    ErrorSpan(
+                        start=char_index,
+                        end=char_index + len(sentence),
+                        reason=f"NSFW content detected: {', '.join(pred_labels)}",
+                    )
+                )
+            else:
+                clean_sentences.append(sentence)
+            char_index += len(sentence) + 1  
+
+        if nsfw_sentences:
+            nsfw_sentences_text = "- " + "\n- ".join(nsfw_sentences)
+
             return FailResult(
                 metadata=metadata,
                 error_message=(
                     f"The following sentences in your response "
                     "were found to be NSFW:\n"
-                    f"\n{unsupported_sentences}"
+                    f"\n{nsfw_sentences_text}"
                 ),
-                fix_value="\n".join(supported_sentences),
+                fix_value="\n".join(clean_sentences),
+                error_spans=error_spans,
             )
-        return PassResult()
-
-    def validate_full_text(
-        self, value: str, metadata: Dict[str, Any]
-    ) -> ValidationResult:
-        """Validate that the entire generated text is SFW."""
-
-        is_nsfw = self.is_nsfw(value)
-        if is_nsfw:
-            return FailResult(
-                metadata=metadata,
-                error_message="The generated text was found to be NSFW.",
-            )
-        return PassResult()
+        return PassResult(metadata=metadata)
 
     def validate(self, value: str, metadata: Dict[str, Any]) -> ValidationResult:
-        """Validation method of the NSFWText validator."""
-        if self._validation_method == "sentence":
-            return self.validate_each_sentence(value, metadata)
+        """Validation method for the NSFW text validator."""
+        if not value:
+            raise ValueError("Value cannot be empty.")
 
-        if self._validation_method == "full":
-            return self.validate_full_text(value, metadata)
+        return self.validate_each_sentence(value, metadata)
+
+    def _inference_local(self, model_input: str | list) -> ValidationResult:
+        """Local inference method for the NSFW text validator."""
+        
+        if isinstance(model_input, str):
+            model_input = [model_input]
+        predictions = []
+        for text in model_input:
+            pred_labels = self.is_nsfw(text)
+            predictions.append(pred_labels)
+        
+        return predictions
+
+    def _inference_remote(self, model_input: str | list) -> ValidationResult:
+        """Remote inference method for the NSFW text validator."""
+        
+        if isinstance(model_input, str):
+            model_input = [model_input]
+        
+        request_body = {
+            "inputs": [
+                {
+                    "name": "text",
+                    "shape": [len(model_input)],
+                    "data": model_input,
+                    "datatype": "BYTES"
+                },
+                {
+                    "name": "threshold",
+                    "shape": [1],
+                    "data": [self._threshold],
+                    "datatype": "FP32"
+                }
+            ]
+        }
+        response = self._hub_inference_request(json.dumps(request_body), self.validation_endpoint)
+        if not response or "outputs" not in response:
+            raise ValueError("Invalid response from remote inference", response)
+        
+        data = [output["data"][0] for output in response["outputs"]]
+        return data
+
+
+    def get_error_spans(self, original: str, fixed: str) -> List[ErrorSpan]:
+        """Generate error spans to display in failresult (if they exist). Error
+        spans show the character-level range of text that has failed validation.
+
+        Args:
+            original (str): The input string
+            fixed (str): The 'validated' output string
+
+        Returns:
+            List[ErrorSpan]: A list of ErrorSpans to represent validation failures
+            over the character sequence.
+        """
+        differ = difflib.Differ()
+        diffs = list(differ.compare(original, fixed))
+        error_spans = []
+        start = None
+        for i, diff in enumerate(diffs):
+            if diff.startswith("- "):
+                if start is None:
+                    start = i
+            else:
+                if start is not None:
+                    error_spans.append(
+                        ErrorSpan(
+                            start=start,
+                            end=i,
+                            reason="NSFW content detected",
+                        )
+                    )
+                    start = None
+        return error_spans
