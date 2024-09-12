@@ -4,7 +4,7 @@ from validator.main import NSFWText
 
 # Setup Guard with NSFWText validator
 guard = Guard().use(
-    NSFWText, threshold=0.8, validation_method="sentence", on_fail="exception"
+    NSFWText, threshold=0.8, validation_method="sentence", on_fail="exception", use_local=True,
 )
 
 # Test passing response (no NSFW content)
