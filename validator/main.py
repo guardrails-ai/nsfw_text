@@ -85,7 +85,7 @@ class NSFWText(Validator):
             if results:
                 results = cast(List[List[Dict[str, Any]]], results)
                 for result in results:
-                    label, score = result["label"], result["score"]
+                    label, score = result["label"], result["score"] #type: ignore
                     if label == "NSFW" and score > self._threshold:
                         pred_labels.append(label)
         return pred_labels
@@ -152,7 +152,7 @@ class NSFWText(Validator):
             pred_labels = self.is_nsfw(text)
             predictions.append(pred_labels)
         
-        return predictions
+        return predictions #type: ignore
 
     def _inference_remote(self, model_input: str | list) -> ValidationResult:
         """Remote inference method for the NSFW text validator."""
@@ -181,7 +181,7 @@ class NSFWText(Validator):
             raise ValueError("Invalid response from remote inference", response)
         
         data = [output["data"][0] for output in response["outputs"]]
-        return data
+        return data #type: ignore
 
 
     def get_error_spans(self, original: str, fixed: str) -> List[ErrorSpan]:
