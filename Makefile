@@ -1,8 +1,14 @@
+.PHONY: test dev lint type qa 
+
+dev:
+	pip install -e ".[dev]"
+	python3 validator/post-install.py
+
 lint:
 	ruff check .
 
-tests:
-	pytest ./test
+test:
+	pytest -v tests
 
 type:
 	pyright validator
@@ -10,4 +16,5 @@ type:
 qa:
 	make lint
 	make type
-	make tests
+	make test
+	
