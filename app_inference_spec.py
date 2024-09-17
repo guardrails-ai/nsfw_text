@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import HTTPException
 from pydantic import BaseModel
-from typing import List, Union, cast
+from typing import List, Tuple
 import torch
 import os
 from models_host.base_inference_spec import BaseInferenceSpec
@@ -40,7 +40,7 @@ class InferenceSpec(BaseInferenceSpec):
             device=torch.device(torch_device)
         )
     
-    def process_request(self, input_request: InputRequest) -> OutputResponse:
+    def process_request(self, input_request: InputRequest) -> Tuple[Tuple, dict]:
         threshold = None
         for inp in input_request.inputs:
             if inp.name == "text":
