@@ -37,7 +37,7 @@ class InferenceSpec(BaseInferenceSpec):
         self.model = pipeline(
             "text-classification", 
             model=model_name,
-            device=torch_device
+            device=torch.device(torch_device)
         )
     
     def process_request(self, input_request: InputRequest) -> OutputResponse:
