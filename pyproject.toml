@@ -1,6 +1,6 @@
 [project]
 name = "nsfw_text"
-version = "0.0.0"
+version = "0.0.1"
 description = "A Guardrails AI validator to detect NSFW text"
 authors = [
     {name = "Guardrails AI", email = "contact@guardrailsai.com"}
